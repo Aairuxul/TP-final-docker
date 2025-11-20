@@ -343,8 +343,7 @@ docker compose up -d --build
 
 ## Bonus réalisés
 
-✅ **Reverse proxy Nginx** : Implémenté avec succès pour gérer le routage entre le frontend (`/`) et le backend
-(`/api/`). Le reverse proxy gère également les en-têtes CORS et les requêtes OPTIONS.
+✅ **Reverse proxy Nginx** : Implémenté avec succès pour gérer le routage entre le frontend (`/`) et le backend (`/api/`). Le reverse proxy gère également les en-têtes CORS et les requêtes OPTIONS.
 
 ✅ **Healthchecks** : Tous les services disposent de healthchecks pour garantir leur disponibilité avant que les services dépendants ne démarrent.
 
