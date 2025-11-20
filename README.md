@@ -200,8 +200,7 @@ Utilisation du volume `pgdata` pour PostgreSQL :
 
 ## Mode Développement (docker-compose.override.yml)
 
-Le fichier `docker-compose.override.yml` permet de modifier le comportement de la stack pour le développement local. Il
-est automatiquement fusionné avec `docker-compose.yml` lors de l'exécution de `docker compose up`.
+Le fichier `docker-compose.override.yml` permet de modifier le comportement de la stack pour le développement local. Il est automatiquement fusionné avec `docker-compose.yml` lors de l'exécution de `docker compose up`.
 
 ### Modifications apportées en mode dev :
 
@@ -226,9 +225,6 @@ est automatiquement fusionné avec `docker-compose.yml` lors de l'exécution de 
 ### Commandes en mode développement :
 
 ```bash
-# Lancer la stack en mode dev (sans reverse-proxy)
-docker compose up -d
-
 # Lancer la stack en mode dev avec le reverse-proxy
 docker compose --profile with-proxy up -d
 
