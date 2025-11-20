@@ -17,17 +17,57 @@ données ainsi que la bonne communication entre les services.
 
 ## Architecture Globale
 
-La stack se compose de quatre services orchestrés par `docker compose` :
+```mermaid
+graph TB
+    subgraph " "
+        User["👤 UTILISATEUR"]
+    end
 
--   **API (Backend)**: `spring-api` — application Spring Boot (Java 21) qui fournit une API REST pour gérer les ressources
-    (`Item`). Elle est construite avec un `Dockerfile` multi-stage et écoute sur le port `8080` (accessible uniquement
-    via le réseau Docker interne). Restart policy : `unless-stopped`.
+    User -->|"HTTP :80"| ReverseProxy
+
+    subgraph Docker["🐳 Docker Compose"]
+        ReverseProxy["🔀 REVERSE PROXY<br/>nginx:stable-alpine<br/>✓ Healthcheck: /api/health"]
+
+        ReverseProxy -->|"/ (root)"| Frontend
+        ReverseProxy -->|"/api/*"| Backend
+
+        Frontend["⚛️ FRONTEND<br/>Vite + React + Nginx<br/>Port: 80 (interne)<br/>✓ Healthcheck: /"]
+
+        Backend["☕ BACKEND<br/>Spring Boot (Java 21)<br/>Port: 8080 (interne)<br/>✓ Healthcheck: /api/health"]
+
+        Backend -->|"JDBC :5432"| Database
+
+        Database["🗄️ DATABASE<br/>PostgreSQL 16 Alpine<br/>Port: 5432 (interne)<br/>💾 Volume: pgdata<br/>✓ Healthcheck: pg_isready"]
+    end
+
+    style User fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    style ReverseProxy fill:#fff3e0,stroke:#e65100,stroke-width:3px
+    style Frontend fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style Backend fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    style Database fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
+    style Docker fill:#ffffff,stroke:#1976d2,stroke-width:3px,stroke-dasharray: 5 5
+```
+
+**Légende** :
+
+-   🔀 **Reverse Proxy** : Point d'entrée unique (port 80)
+-   ⚛️ **Frontend** : Interface utilisateur React
+-   ☕ **Backend** : API REST Spring Boot
+-   🗄️ **Database** : Base de données PostgreSQL avec persistance
+-   ✓ Tous les services ont des healthchecks
+-   🐳 Tous les services communiquent via le réseau Docker Bridge
+
+### Description des services
+
+-   **API (Backend)**: `spring-api` — application Spring Boot (Java 21) qui fournit une API REST pour gérer les
+    ressources (`Item`). Elle est construite avec un `Dockerfile` multi-stage et écoute sur le port `8080` (accessible
+    uniquement via le réseau Docker interne). Dispose d'un healthcheck sur `/api/health`.
 -   **Frontend (Web)**: `webapp` — application JavaScript (Vite + React) qui est buildée puis servie par Nginx.
-    Accessible uniquement via le reverse-proxy. Restart policy : `unless-stopped`.
--   **Reverse Proxy**: `reverse-proxy` — Nginx qui expose le port `80` sur l'hôte et route `/` vers le frontend et `/api/`
-    vers le backend. C'est le seul point d'entrée public. Restart policy : `always`.
--   **Base de données (PostgreSQL)**: service `db` — stocke les données persistantes. Les données sont conservées via le
-    volume Docker nommé `pgdata`.
+    Accessible uniquement via le reverse-proxy. Dispose d'un healthcheck.
+-   **Reverse Proxy**: `reverse-proxy` — Nginx qui expose le port `80` sur l'hôte et route `/` vers le frontend et
+    `/api/` vers le backend. C'est le seul point d'entrée public. Dispose d'un healthcheck.
+-   **Base de données (PostgreSQL)**: service `db` (PostgreSQL 16 Alpine) — stocke les données persistantes. Les données
+    sont conservées via le volume Docker nommé `pgdata`. Dispose d'un healthcheck pour vérifier la disponibilité.
 
 Commande pour démarrer le projet :
 
@@ -43,7 +83,10 @@ Pour tester :
 Autres informations :
 
 -   Fichier `.env` pour les secrets (mot de passe DB, utilisateurs) à créer en se basant sur le `.env.example`.
--   En mode dev; utilisation d'un reseau interne via le réseau Docker.
+-   Utilisation d'un réseau Bridge Docker par défaut pour la communication entre services.
+-   Tous les services disposent de healthchecks pour garantir leur bon démarrage.
+-   Les dépendances entre services sont gérées via `depends_on` avec conditions `service_healthy`.
+-   Le reverse proxy gère les en-têtes CORS et les requêtes preflight OPTIONS.
 
 ## Commandes pour builder et lancer
 
@@ -83,11 +126,12 @@ docker compose down
 docker compose down -v
 ```
 
-- S'assurer que le serveur est bien lancé avec :
+-   S'assurer que le serveur est bien lancé avec :
 
 ```bash
 docker logs -f tp-spring-api-1
 ```
+
 Veillez à bien attendre que la base de données affiche son contenu avant de tester si tout fonctionne.
 
 ## Endpoints API et URLs
@@ -102,25 +146,32 @@ Endpoints implémentés dans l'API :
 -   `POST /api/items` — crée un nouvel item (corps JSON avec les champs de `Item`).
 
 **Important** : Le frontend utilise des URLs relatives (`/api/...`) pour appeler l'API, ce qui garantit que toutes les
-requêtes passent par le reverse-proxy. Les contrôleurs Spring n'exposent plus `@CrossOrigin` ; le reverse-proxy gère les en-têtes CORS et les requêtes preflight OPTIONS.
+requêtes passent par le reverse-proxy. Les contrôleurs Spring n'exposent plus `@CrossOrigin` ; le reverse-proxy gère les
+en-têtes CORS et les requêtes preflight OPTIONS.
 
 ## Problèmes rencontrés et solutions
 
 Voici les problèmes que nous avons pu rencontrer et les solutions que nous avons trouvées :
 
 -   Nous avons découvert le reverse proxy et avons mis un peu de temps à comprendre comme ça marchait réellement
+-   Nous avons vu que la connexion entre le front et back n'était pas présente. La solution se trouvait dans le fait
+    d'avoir le reverse proxy qui fonctionne mieux et notre docker compose qui ne gere pas les ports vu que seul le
+    reverse proxy agit dessus.
+-   Nous avons eu quelques difficultés avec le docker-compose.override.
 
-## Tâches à réaliser
+## Tâches réalisées
 
-1. Écrire les `Dockerfile` pour le backend (multi-stage) et le frontend (build + Nginx).
-    - Chaque dossier contiendra son propre `Dockerfile`.
-2. Créer le fichier `.env` pour les secrets.
-3. Écrire le `docker-compose.yml` complet (API, Web, DB).
-4. Tester le bon fonctionnement de la stack :
-    - API accessible via le reverse-proxy : `http://localhost/api/`
-    - Frontend sur `http://localhost/` (reverse-proxy)
-    - Persistance PostgreSQL via volume.
-5. Ecrire une documentation claire et précise.
+✅ 1. Écriture des `Dockerfile` pour le backend (multi-stage) et le frontend (build + Nginx). - Chaque dossier contient
+son propre `Dockerfile`.
+
+✅ 2. Création du fichier `.env` pour les secrets (à créer à partir du `.env.example`).
+
+✅ 3. Écriture du `docker-compose.yml` complet (API, Web, DB, Reverse Proxy).
+
+✅ 4. Tests de bon fonctionnement de la stack : - API accessible via le reverse-proxy : `http://localhost/api/` -
+Frontend sur `http://localhost/` (reverse-proxy) - Persistance PostgreSQL via volume.
+
+✅ 5. Documentation claire et précise rédigée.
 
 ---
 
@@ -140,14 +191,18 @@ docker compose up -d --build
 -   API accessible via le proxy : [http://localhost/api/health](http://localhost/api/health)
 -   PostgreSQL persistant via le volume `pgdata`
 
-## Bonus (optionnel)
+## Bonus réalisés
 
-<p></p>
+✅ **Reverse proxy Nginx** : Implémenté avec succès pour gérer le routage entre le frontend (`/`) et le backend
+(`/api/`). Le reverse proxy gère également les en-têtes CORS et les requêtes OPTIONS.
 
-💡 Pour aller plus loin :
+✅ **Healthchecks** : Tous les services disposent de healthchecks pour garantir leur disponibilité avant que les
+services dépendants ne démarrent.
 
--   Ajouter un **service pgAdmin** pour visualiser la base.
--   Ajouter un **reverse proxy Nginx** entre le frontend et le backend.
--   Configurer une **intégration CI/CD** pour tester et builder la stack automatiquement.
+✅ **Configuration optimisée** : Utilisation de `depends_on` avec conditions `service_healthy` pour orchestrer le
+démarrage des services dans le bon ordre.
 
-> Notifier les bonus effectués dans la documentation.
+💡 Bonus non réalisés :
+
+-   Service pgAdmin pour visualiser la base de données.
+-   Intégration CI/CD pour tester et builder la stack automatiquement.
