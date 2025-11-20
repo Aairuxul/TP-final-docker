@@ -1,73 +1,72 @@
 services:
+    # Database service
+    db:
+        image: postgres:16-alpine
+        environment:
+            POSTGRES_USER: ${POSTGRES_USER}
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+            POSTGRES_DB: ${POSTGRES_DB}
+        volumes:
+            - pgdata:/var/lib/postgresql/data
+        healthcheck:
+            test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+            interval: 3s
+            timeout: 2s
+            retries: 2
+            start_period: 5s
 
-  # Database service
-  db:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 3s
-      timeout: 2s
-      retries: 2
-      start_period: 5s
+    # Spring Boot API service
+    spring-api:
+        build: ./spring-api
+        environment:
+            SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB}
+            SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+            SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+        depends_on:
+            db:
+                condition: service_healthy
+        healthcheck:
+            test: ['CMD-SHELL', 'wget --no-verbose --tries=1 --spider http://localhost:8080/api/health || exit 1']
+            interval: 3s
+            timeout: 2s
+            retries: 2
+            start_period: 10s
 
-  # Spring Boot API service
-  spring-api:
-    build: ./spring-api
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
-    depends_on:
-      db:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/api/health || exit 1"]
-      interval: 3s
-      timeout: 2s
-      retries: 2
-      start_period: 10s
+    # Frontend Web Application service
+    webapp:
+        build: ./webapp
+        depends_on:
+            spring-api:
+                condition: service_healthy
+        healthcheck:
+            test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://127.0.0.1/']
+            interval: 2s
+            timeout: 2s
+            retries: 2
+            start_period: 3s
 
-  # Frontend Web Application service
-  webapp:
-    build: ./webapp
-    depends_on:
-      spring-api:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/"]
-      interval: 2s
-      timeout: 2s
-      retries: 2
-      start_period: 3s
-
-  # Nginx Reverse Proxy service
-  reverse-proxy:
-    image: nginx:stable-alpine
-    volumes:
-      - ./reverse-proxy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-    ports:
-      - "80:80"
-    depends_on:
-      webapp:
-        condition: service_healthy
-      spring-api:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1/api/health || exit 1"]
-      interval: 2s
-      timeout: 2s
-      retries: 2
-      start_period: 3s
+    # Nginx Reverse Proxy service
+    reverse-proxy:
+        image: nginx:stable-alpine
+        volumes:
+            - ./reverse-proxy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+        ports:
+            - '80:80'
+        depends_on:
+            webapp:
+                condition: service_healthy
+            spring-api:
+                condition: service_healthy
+        healthcheck:
+            test: ['CMD-SHELL', 'wget --no-verbose --tries=1 --spider http://127.0.0.1/api/health || exit 1']
+            interval: 2s
+            timeout: 2s
+            retries: 2
+            start_period: 3s
 
 volumes:
-  pgdata:
+    pgdata:
 
 networks:
-  default:
-    driver: bridge
+    default:
+        driver: bridge
