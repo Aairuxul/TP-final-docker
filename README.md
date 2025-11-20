@@ -201,8 +201,3 @@ services dépendants ne démarrent.
 
 ✅ **Configuration optimisée** : Utilisation de `depends_on` avec conditions `service_healthy` pour orchestrer le
 démarrage des services dans le bon ordre.
-
-💡 Bonus non réalisés :
-
--   Service pgAdmin pour visualiser la base de données.
--   Intégration CI/CD pour tester et builder la stack automatiquement.
