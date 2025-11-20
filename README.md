@@ -234,8 +234,7 @@ docker compose --profile with-proxy up -d
 # Reverse Proxy (si activé): http://localhost:80
 ```
 
-> **Note** : En mode développement, les services sont accessibles directement, ce qui facilite le debugging. En
-> production, utilisez uniquement le `docker-compose.yml` sans override.
+> **Note** : En mode développement, les services sont accessibles directement, ce qui facilite le debugging. En production, utilisez uniquement le `docker-compose.yml` sans override.
 
 ---
 
