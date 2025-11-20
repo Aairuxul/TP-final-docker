@@ -40,12 +40,12 @@ graph TB
         Database["🗄️ DATABASE<br/>PostgreSQL 16 Alpine<br/>Port: 5432 (interne)<br/>💾 Volume: pgdata<br/>✓ Healthcheck: pg_isready"]
     end
 
-    style User fill:#e1f5ff,stroke:#01579b,stroke-width:2px
-    style ReverseProxy fill:#fff3e0,stroke:#e65100,stroke-width:3px
-    style Frontend fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
-    style Backend fill:#fce4ec,stroke:#c2185b,stroke-width:2px
-    style Database fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
-    style Docker fill:#ffffff,stroke:#1976d2,stroke-width:3px,stroke-dasharray: 5 5
+    style User fill:#1a1d29,stroke:#58a6ff,stroke-width:2px,color:#c9d1d9
+    style ReverseProxy fill:#2d1b0e,stroke:#ff9800,stroke-width:3px,color:#c9d1d9
+    style Frontend fill:#0d2818,stroke:#3fb950,stroke-width:2px,color:#c9d1d9
+    style Backend fill:#2b1a24,stroke:#f85149,stroke-width:2px,color:#c9d1d9
+    style Database fill:#221a2d,stroke:#a371f7,stroke-width:2px,color:#c9d1d9
+    style Docker fill:#0d1117,stroke:#1f6feb,stroke-width:3px,stroke-dasharray: 5 5,color:#c9d1d9
 ```
 
 **Légende** :
