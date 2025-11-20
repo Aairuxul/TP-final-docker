@@ -9,7 +9,12 @@ Assembler et exécuter une **application web complète** composée de trois serv
 -   **Backend :** API REST Spring Boot
 -   **Frontend :** application React ou Vue
 -   **Base de données :** PostgreSQL
+-   **Backend :** API REST Spring Boot
+-   **Frontend :** application React ou Vue
+-   **Base de données :** PostgreSQL
 
+L’objectif est de conteneuriser chaque service, les orchestrer avec **Docker Compose**, et garantir la persistance des
+données ainsi que la bonne communication entre les services.
 L’objectif est de conteneuriser chaque service, les orchestrer avec **Docker Compose**, et garantir la persistance des
 données ainsi que la bonne communication entre les services.
 
@@ -61,13 +66,15 @@ graph TB
 
 -   **API (Backend)**: `spring-api` — application Spring Boot (Java 21) qui fournit une API REST pour gérer les
     ressources (`Item`). Elle est construite avec un `Dockerfile` multi-stage et écoute sur le port `8080` (accessible
-    uniquement via le réseau Docker interne). Dispose d'un healthcheck sur `/api/health`.
+    uniquement via le réseau Docker interne). Dispose d'un healthcheck sur `/api/health`. Restart policy:
+    `unless-stopped`.
 -   **Frontend (Web)**: `webapp` — application JavaScript (Vite + React) qui est buildée puis servie par Nginx.
-    Accessible uniquement via le reverse-proxy. Dispose d'un healthcheck.
+    Accessible uniquement via le reverse-proxy. Dispose d'un healthcheck. Restart policy: `unless-stopped`.
 -   **Reverse Proxy**: `reverse-proxy` — Nginx qui expose le port `80` sur l'hôte et route `/` vers le frontend et
-    `/api/` vers le backend. C'est le seul point d'entrée public. Dispose d'un healthcheck.
+    `/api/` vers le backend. C'est le seul point d'entrée public. Dispose d'un healthcheck. Restart policy: `always`.
 -   **Base de données (PostgreSQL)**: service `db` (PostgreSQL 16 Alpine) — stocke les données persistantes. Les données
     sont conservées via le volume Docker nommé `pgdata`. Dispose d'un healthcheck pour vérifier la disponibilité.
+    Restart policy: `always`.
 
 Commande pour démarrer le projet :
 
@@ -87,6 +94,53 @@ Autres informations :
 -   Tous les services disposent de healthchecks pour garantir leur bon démarrage.
 -   Les dépendances entre services sont gérées via `depends_on` avec conditions `service_healthy`.
 -   Le reverse proxy gère les en-têtes CORS et les requêtes preflight OPTIONS.
+-   **Restart policies** : `always` pour la DB et le reverse-proxy, `unless-stopped` pour l'API et le frontend.
+-   Un fichier `docker-compose.override.yml` est disponible pour le développement local (voir section dédiée).
+
+## Mode Développement (docker-compose.override.yml)
+
+Le fichier `docker-compose.override.yml` permet de modifier le comportement de la stack pour le développement local. Il
+est automatiquement fusionné avec `docker-compose.yml` lors de l'exécution de `docker compose up`.
+
+### Modifications apportées en mode dev :
+
+-   **Backend (spring-api)** :
+
+    -   Port `8080` exposé directement sur l'hôte (accessible via `http://localhost:8080`)
+    -   Variable d'environnement `SPRING_PROFILES_ACTIVE=dev` activée
+    -   Permet le debugging et le hot-reload
+
+-   **Frontend (webapp)** :
+
+    -   Utilise le stage `dev` du Dockerfile multi-stage
+    -   Commande `npm run dev -- --host` pour lancer Vite en mode développement
+    -   Port `5173` exposé sur l'hôte (accessible via `http://localhost:5173`)
+    -   Hot Module Replacement (HMR) activé pour le développement React
+
+-   **Reverse Proxy** :
+    -   Désactivé par défaut via le profile `with-proxy`
+    -   Pour l'activer : `docker compose --profile with-proxy up -d`
+    -   En mode dev, l'accès direct aux services est privilégié
+
+### Commandes en mode développement :
+
+```bash
+# Lancer la stack en mode dev (sans reverse-proxy)
+docker compose up -d
+
+# Lancer la stack en mode dev avec le reverse-proxy
+docker compose --profile with-proxy up -d
+
+# Accès direct aux services en mode dev
+# Frontend: http://localhost:5173
+# Backend: http://localhost:8080
+# Reverse Proxy (si activé): http://localhost:80
+```
+
+> **Note** : En mode développement, les services sont accessibles directement, ce qui facilite le debugging. En
+> production, utilisez uniquement le `docker-compose.yml` sans override.
+
+---
 
 ## Commandes pour builder et lancer
 
