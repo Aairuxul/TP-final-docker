@@ -6,85 +6,106 @@ Projet réalisé par Valentin Russeil et Mattéo Pereira.
 
 Assembler et exécuter une **application web complète** composée de trois services :
 
-* **Backend :** API REST Spring Boot
-* **Frontend :** application React ou Vue
-* **Base de données :** PostgreSQL
+-   **Backend :** API REST Spring Boot
+-   **Frontend :** application React ou Vue
+-   **Base de données :** PostgreSQL
 
-L’objectif est de conteneuriser chaque service, les orchestrer avec **Docker Compose**, et garantir la persistance des données ainsi que la bonne communication entre les services.
+L’objectif est de conteneuriser chaque service, les orchestrer avec **Docker Compose**, et garantir la persistance des
+données ainsi que la bonne communication entre les services.
 
 ---
 
 ## Architecture Globale
 
-La stack se compose de trois services principaux orchestrés par `docker-compose` :
+La stack se compose de trois services principaux orchestrés par `docker compose` :
 
-- **API (Backend)**: `spring-api` — application Spring Boot qui fournit une API REST pour gérer les ressources (`Item`). Elle est construite avec un `Dockerfile` multi-stage et écoute sur le port `8080` (accessible via le réseau Docker et le reverse-proxy).
-- **Frontend (Web)**: `webapp` — application JavaScript (Vite + React) qui est buildée puis servie par une image Nginx. Le frontend est accessible via le reverse-proxy (port `80` sur l'hôte).
-- **Base de données (PostgreSQL)**: service `db` — stocke les données persistantes. Les données sont conservées via le volume Docker nommé `pgdata`.
+-   **API (Backend)**: `spring-api` — application Spring Boot qui fournit une API REST pour gérer les ressources
+    (`Item`). Elle est construite avec un `Dockerfile` multi-stage et écoute sur le port `8080` (accessible via le
+    réseau Docker et le reverse-proxy).
+-   **Frontend (Web)**: `webapp` — application JavaScript (Vite + React) qui est buildée puis servie par une image
+    Nginx. Le frontend est accessible via le reverse-proxy (port `80` sur l'hôte).
+-   **Base de données (PostgreSQL)**: service `db` — stocke les données persistantes. Les données sont conservées via le
+    volume Docker nommé `pgdata`.
 
-Commande pour démarrer la stack :
+Commande pour démarrer le projet :
+
 ```
-docker compose up -d --build
+docker compose up -d
 ```
 
 Pour tester :
-- Frontend : `http://localhost:8081`
--- Backend (via proxy) : `http://localhost/api/`
+
+-   Frontend : `http://localhost/`
+-   Backend (via proxy) : `http://localhost/api/`
 
 Autres informations :
-- Fichier `.env` pour les secrets (mot de passe DB, utilisateurs).
-- Ne pas exposer PostgreSQL en production ; laisser la base accessible uniquement via le réseau Docker.
+
+-   Fichier `.env` pour les secrets (mot de passe DB, utilisateurs) à créer en se basant sur le `.env.example`.
+-   En mode dev; utilisation d'un reseau interne via le réseau Docker.
 
 ## Commandes pour builder et lancer
 
-- Construire et démarrer la stack :
+-   Construire et démarrer la stack :
+
 ```bash
 docker compose up -d --build
 ```
-- Rebuilder les images :
+
+-   Rebuilder les images :
+
 ```bash
 docker compose build
 ```
-- Lancer les services :
+
+-   Lancer les services :
+
 ```bash
 docker compose up -d
 ```
-- Couper les services :
+
+-   Couper les services :
+
 ```bash
 docker compose down
 ```
 
+- S'assurer que le serveur est bien lancé avec :
+
+```bash
+docker logs -f tp-spring-api-1
+```
+Veillez à bien attendre que la base de données affiche son contenu avant de tester si tout fonctionne.
 
 ## Endpoints API et URLs
 
-- Frontend : `http://localhost/` (reverse-proxy)
-- Backend (base URL proxied) : `http://localhost/api/` (via reverse-proxy)
+-   Frontend : `http://localhost/` (reverse-proxy)
+-   Backend (base URL proxied) : `http://localhost/api/` (via reverse-proxy)
 
 Endpoints implémentés dans l'API :
-- `GET /api/health` — vérifie l'état de l'API (retourne `{ "status": "ok" }`).
-- `GET /api/items` — récupère la liste de tous les items.
-- `POST /api/items` — crée un nouvel item (corps JSON avec les champs de `Item`).
 
-Note: les contrôleurs n'exposent plus `@CrossOrigin`; le reverse-proxy centralisé résout les problèmes CORS en gérant les en-têtes et les préflight OPTIONS. Ne pas laisser `@CrossOrigin(origins = "*")` en production.
+-   `GET /api/health` — vérifie l'état de l'API (retourne `{ "status": "ok" }`).
+-   `GET /api/items` — récupère la liste de tous les items. (Ce sera vide pour notre cas)
+-   `POST /api/items` — crée un nouvel item (corps JSON avec les champs de `Item`).
+
+Note: les contrôleurs n'exposent plus `@CrossOrigin`; le reverse-proxy centralisé résout les problèmes CORS en gérant
+les en-têtes et les préflight OPTIONS.
 
 ## Problèmes rencontrés et solutions
 
 Voici les problèmes que nous avons pu rencontrer et les solutions que nous avons touvées :
 
-- Docker Compose : orchestration simple pour développement et tests locaux ; facilite la montée en charge d'une stack multi-service.
-- Multi-stage Dockerfile (Backend) : permet de produire une image finale légère sans inclure les outils de build.
-- `.env` pour secrets : séparer la configuration de l'image, plus modulable pour les changements de nom. Présence d'un .`env.example` pour créer le template à modifier
+-   Nous avons découvert le reverse proxy et avons mis un peu de temps à comprendre comme ça marchait réellement
 
 ## Tâches à réaliser
 
 1. Écrire les `Dockerfile` pour le backend (multi-stage) et le frontend (build + Nginx).
-   - Chaque dossier contiendra son propre `Dockerfile`.
+    - Chaque dossier contiendra son propre `Dockerfile`.
 2. Créer le fichier `.env` pour les secrets.
 3. Écrire le `docker-compose.yml` complet (API, Web, DB).
 4. Tester le bon fonctionnement de la stack :
-   * API accessible via le reverse-proxy : `http://localhost/api/`
-   * Frontend sur `localhost:8081`
-   * Persistance PostgreSQL via volume.
+    - API accessible via le reverse-proxy : `http://localhost/api/`
+    - Frontend sur `http://localhost/` (reverse-proxy)
+    - Persistance PostgreSQL via volume.
 5. Ecrire une documentation claire et précise.
 
 ---
@@ -101,17 +122,9 @@ docker compose up -d --build
 
 2️⃣ Vérifier que tout fonctionne :
 
-* Frontend disponible sur [http://localhost/](http://localhost/)
-* API accessible via le proxy : [http://localhost/api/health](http://localhost/api/health)
-* PostgreSQL persistant via le volume `pgdata`
-
-3️⃣ Consulter les logs si besoin :
-
-```bash
-docker compose logs -f
-```
-
----
+-   Frontend disponible sur [http://localhost/](http://localhost/)
+-   API accessible via le proxy : [http://localhost/api/health](http://localhost/api/health)
+-   PostgreSQL persistant via le volume `pgdata`
 
 ## Bonus (optionnel)
 
@@ -119,10 +132,8 @@ docker compose logs -f
 
 💡 Pour aller plus loin :
 
-* Ajouter un **service pgAdmin** pour visualiser la base.
-* Ajouter un **reverse proxy Nginx** entre le frontend et le backend.
-* Configurer une **intégration CI/CD** pour tester et builder la stack automatiquement.
+-   Ajouter un **service pgAdmin** pour visualiser la base.
+-   Ajouter un **reverse proxy Nginx** entre le frontend et le backend.
+-   Configurer une **intégration CI/CD** pour tester et builder la stack automatiquement.
 
 > Notifier les bonus effectués dans la documentation.
-
-
