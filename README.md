@@ -14,9 +14,9 @@ Assembler et exécuter une **application web complète** composée de trois serv
 -   **Base de données :** PostgreSQL
 
 L’objectif est de conteneuriser chaque service, les orchestrer avec **Docker Compose**, et garantir la persistance des
-données ainsi que la bonne communication entre les services.
-L’objectif est de conteneuriser chaque service, les orchestrer avec **Docker Compose**, et garantir la persistance des
-données ainsi que la bonne communication entre les services.
+données ainsi que la bonne communication entre les services. L’objectif est de conteneuriser chaque service, les
+orchestrer avec **Docker Compose**, et garantir la persistance des données ainsi que la bonne communication entre les
+services.
 
 ---
 
@@ -96,6 +96,107 @@ Autres informations :
 -   Le reverse proxy gère les en-têtes CORS et les requêtes preflight OPTIONS.
 -   **Restart policies** : `always` pour la DB et le reverse-proxy, `unless-stopped` pour l'API et le frontend.
 -   Un fichier `docker-compose.override.yml` est disponible pour le développement local (voir section dédiée).
+
+---
+
+## Choix Techniques
+
+### 🏗️ Architecture et Infrastructure
+
+#### **Multi-stage Dockerfiles**
+
+Nous avons opté pour des Dockerfiles multi-stage pour optimiser la taille des images finales :
+
+-   **Backend (Spring Boot)** : Compilation avec Maven dans un premier stage, puis copie du JAR dans une image JRE minimale
+-   **Frontend (React)** : Build de l'application Vite dans un stage Node.js, puis déploiement dans Nginx Alpine
+-   **Avantages** : Images de production légères, temps de build optimisés, séparation claire entre environnement de build et runtime
+
+#### **Images Alpine Linux**
+
+Choix d'images basées sur Alpine (PostgreSQL 16 Alpine, Nginx Alpine) pour :
+
+-   Réduire la surface d'attaque (sécurité)
+-   Minimiser l'empreinte mémoire et disque
+-   Accélérer les temps de pull et déploiement
+
+#### **Reverse Proxy Nginx**
+
+Implémentation d'un reverse proxy pour :
+
+-   Centraliser le point d'entrée (Single Point of Entry)
+-   Gérer le routage intelligent : `/` → frontend, `/api/*` → backend
+-   Gérer les en-têtes CORS et les requêtes preflight OPTIONS
+-   Simplifier la configuration SSL/TLS en production (un seul certificat)
+-   Isoler les services internes du réseau public
+
+### 🔄 Orchestration Docker Compose
+
+#### **Healthchecks**
+
+Tous les services disposent de healthchecks personnalisés :
+
+-   **Database** : `pg_isready` pour vérifier la disponibilité PostgreSQL
+-   **Backend** : Requête HTTP sur `/api/health`
+-   **Frontend & Reverse Proxy** : Vérification de disponibilité HTTP
+-   **Bénéfice** : Démarrage ordonné et fiable des services, détection précoce des problèmes
+
+#### **Depends_on avec conditions**
+
+Utilisation de `depends_on` avec `condition: service_healthy` pour :
+
+-   Garantir que la DB est prête avant le démarrage du backend
+-   Attendre que le backend et frontend soient opérationnels avant le reverse proxy
+-   Éviter les erreurs de connexion au démarrage
+
+#### **Restart Policies**
+
+Stratégie de redémarrage différenciée :
+
+-   **Database & Reverse Proxy** : `always` (services critiques, doivent toujours être disponibles)
+-   **Backend & Frontend** : `unless-stopped` (permet l'arrêt manuel pour maintenance)
+
+### 🛠️ Développement vs Production
+
+#### **docker-compose.override.yml**
+
+Séparation claire entre environnements :
+
+-   **Développement** : Ports exposés, hot-reload, debugging activé, reverse proxy optionnel
+-   **Production** : Services isolés, accès uniquement via reverse proxy, optimisation des ressources
+-   **Avantage** : Flexibilité maximale sans duplication de configuration
+
+#### **Profiles Docker Compose**
+
+Le reverse proxy utilise un profil `with-proxy` en mode dev pour :
+
+-   Permettre l'accès direct aux services pendant le développement
+-   Activer le reverse proxy uniquement quand nécessaire pour tester le comportement production
+
+### 🔐 Sécurité
+
+#### **Variables d'environnement et fichier .env**
+
+-   Externalisation des secrets (credentials DB)
+-   Fichier `.env.example` comme template
+-   Jamais de commit des secrets dans le repository
+
+#### **Réseau Bridge isolé**
+
+-   Communication inter-services via noms de services DNS internes
+-   Aucun port exposé directement en production (sauf reverse proxy)
+-   Isolation réseau des services sensibles (DB, API)
+
+### 📦 Persistance des Données
+
+#### **Volume Docker nommé**
+
+Utilisation du volume `pgdata` pour PostgreSQL :
+
+-   Persistance des données entre redémarrages et mises à jour
+-   Isolation des données du système hôte
+-   Facilite les backups et migrations
+
+---
 
 ## Mode Développement (docker-compose.override.yml)
 
