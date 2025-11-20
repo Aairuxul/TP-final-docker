@@ -76,10 +76,16 @@ graph TB
     sont conservées via le volume Docker nommé `pgdata`. Dispose d'un healthcheck pour vérifier la disponibilité.
     Restart policy: `always`.
 
-Commande pour démarrer le projet :
+Commande pour démarrer le projet en **production** :
 
+```bash
+docker compose -f docker-compose.yml up -d
 ```
-docker compose up -d
+
+Commande pour démarrer en **développement** :
+
+```bash
+docker compose --profile with-proxy up -d
 ```
 
 Pour tester :
@@ -89,7 +95,7 @@ Pour tester :
 
 Autres informations :
 
--   Fichier `.env` pour les secrets (mot de passe DB, utilisateurs) à créer en se basant sur le `.env.example`.
+-   Fichier `.env` pour les secrets (mot de passe DB, utilisateurs) à créer en se basant sur le `.env.example`. Et à remplir avec vos propres valeurs.
 -   Utilisation d'un réseau Bridge Docker par défaut pour la communication entre services.
 -   Tous les services disposent de healthchecks pour garantir leur bon démarrage.
 -   Les dépendances entre services sont gérées via `depends_on` avec conditions `service_healthy`.
@@ -236,26 +242,45 @@ docker compose --profile with-proxy up -d
 
 > **Note** : En mode développement, les services sont accessibles directement, ce qui facilite le debugging. En production, utilisez uniquement le `docker-compose.yml` sans override.
 
+> **Important** : En mode developpement, assurez-vous de lancer le compose up avec l'option `--profile with-proxy` car sinon le front et le back ne pourrant pas communiquer ensemble pour des raisons de CORS.
 ---
 
 ## Commandes pour builder et lancer
 
--   Construire et démarrer la stack :
+### Mode Production
+
+-   Construire et démarrer la stack en production :
 
 ```bash
-docker compose up -d --build
+docker compose -f docker-compose.yml up -d --build
 ```
+
+-   Lancer les services en production (sans rebuild) :
+
+```bash
+docker compose -f docker-compose.yml up -d
+```
+
+### Mode Développement
+
+-   Construire et démarrer la stack en développement :
+
+```bash
+docker compose --profile with-proxy up -d --build
+```
+
+-   Lancer les services en développement (sans rebuild) :
+
+```bash
+docker compose --profile with-proxy up -d
+```
+
+### Commandes communes
 
 -   Rebuilder les images :
 
 ```bash
 docker compose build
-```
-
--   Lancer les services :
-
-```bash
-docker compose up -d
 ```
 
 -   Redémarrer les services (sans rebuild) :
@@ -308,6 +333,8 @@ Voici les problèmes que nous avons pu rencontrer et les solutions que nous avon
     d'avoir le reverse proxy qui fonctionne mieux et notre docker compose qui ne gere pas les ports vu que seul le
     reverse proxy agit dessus.
 -   Nous avons eu quelques difficultés avec le docker-compose.override.
+-   Nous avons eu quelques difficultés à configurer proxy Vite et le reverse-proxy nginx ensemble en mode développement. La première solution a été de
+    configurer le proxy Vite uniquement en mode développement et de s'assurer que notre application puisse faire des appels vers le backend sans problème de CORS. Mais en réalisant la doculement, nous nous sommes apperçus d'une commande pouvant gérer le proxy et donc de ne pas toucher au vite.config.js. Et donc, nous avons décider de garder la commande plutôt que de modifier le fichier de configuration.
 
 ## Tâches réalisées
 
@@ -327,23 +354,72 @@ Frontend sur `http://localhost/` (reverse-proxy) - Persistance PostgreSQL via vo
 
 ## Tests et validation
 
-<p></p>
+### Test en mode Production
 
-1️⃣ Lancer la stack :
+1️⃣ Lancer la stack en production :
 
 ```bash
-docker compose up -d --build
+docker compose -f docker-compose.yml up -d --build
 ```
 
-2️⃣ Vérifier que tout fonctionne :
+2️⃣ Vérifier que tous les services sont healthy :
 
--   Frontend disponible sur [http://localhost/](http://localhost/)
--   API accessible via le proxy : [http://localhost/api/health](http://localhost/api/health)
--   PostgreSQL persistant via le volume `pgdata`
+```bash
+docker compose ps
+```
+
+3️⃣ Tester les endpoints :
+
+```bash
+# Frontend (via reverse-proxy)
+curl http://localhost/
+
+# API Health (via reverse-proxy)
+curl http://localhost/api/health
+
+# API Items (via reverse-proxy)
+curl http://localhost/api/items
+```
+
+4️⃣ Vérifier la persistance PostgreSQL :
+
+```bash
+# Ajouter un item via l'interface web ou:
+curl -X POST http://localhost/api/items \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Test Item","description":"Test Description"}'
+
+# Redémarrer la stack
+docker compose -f docker-compose.yml restart
+
+# Vérifier que l'item existe toujours
+curl http://localhost/api/items
+```
+
+### Test en mode Développement
+
+1️⃣ Lancer la stack en développement :
+
+```bash
+docker compose --profile with-proxy up -d --build
+```
+
+2️⃣ Vérifier les accès directs :
+
+```bash
+# Frontend Vite (accès direct)
+curl http://localhost:5173/
+
+# Backend (accès direct)
+curl http://localhost:8080/api/health
+
+# Reverse-proxy
+curl http://localhost/api/health
+```
 
 ## Bonus réalisés
 
-✅ **Reverse proxy Nginx** : Implémenté avec succès pour gérer le routage entre le frontend (`/`) et le backend (`/api/`). Le reverse proxy gère également les en-têtes CORS et les requêtes OPTIONS.
+✅ **Fichier docker-compose.override.yml** : Permet de configurer un mode développement avec ports exposés.
 
 ✅ **Healthchecks** : Tous les services disposent de healthchecks pour garantir leur disponibilité avant que les services dépendants ne démarrent.
 
