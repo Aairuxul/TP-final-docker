@@ -17,13 +17,15 @@ données ainsi que la bonne communication entre les services.
 
 ## Architecture Globale
 
-La stack se compose de trois services principaux orchestrés par `docker compose` :
+La stack se compose de quatre services orchestrés par `docker compose` :
 
--   **API (Backend)**: `spring-api` — application Spring Boot qui fournit une API REST pour gérer les ressources
-    (`Item`). Elle est construite avec un `Dockerfile` multi-stage et écoute sur le port `8080` (accessible via le
-    réseau Docker et le reverse-proxy).
--   **Frontend (Web)**: `webapp` — application JavaScript (Vite + React) qui est buildée puis servie par une image
-    Nginx. Le frontend est accessible via le reverse-proxy (port `80` sur l'hôte).
+-   **API (Backend)**: `spring-api` — application Spring Boot (Java 21) qui fournit une API REST pour gérer les ressources
+    (`Item`). Elle est construite avec un `Dockerfile` multi-stage et écoute sur le port `8080` (accessible uniquement
+    via le réseau Docker interne). Restart policy : `unless-stopped`.
+-   **Frontend (Web)**: `webapp` — application JavaScript (Vite + React) qui est buildée puis servie par Nginx.
+    Accessible uniquement via le reverse-proxy. Restart policy : `unless-stopped`.
+-   **Reverse Proxy**: `reverse-proxy` — Nginx qui expose le port `80` sur l'hôte et route `/` vers le frontend et `/api/`
+    vers le backend. C'est le seul point d'entrée public. Restart policy : `always`.
 -   **Base de données (PostgreSQL)**: service `db` — stocke les données persistantes. Les données sont conservées via le
     volume Docker nommé `pgdata`.
 
@@ -63,10 +65,22 @@ docker compose build
 docker compose up -d
 ```
 
--   Couper les services :
+-   Redémarrer les services (sans rebuild) :
+
+```bash
+docker compose restart
+```
+
+-   Couper les services (conserve les volumes) :
 
 ```bash
 docker compose down
+```
+
+-   Couper et supprimer les volumes (⚠️ perte des données DB) :
+
+```bash
+docker compose down -v
 ```
 
 - S'assurer que le serveur est bien lancé avec :
@@ -78,21 +92,21 @@ Veillez à bien attendre que la base de données affiche son contenu avant de te
 
 ## Endpoints API et URLs
 
--   Frontend : `http://localhost/` (reverse-proxy)
+-   Frontend : `http://localhost/` (reverse-proxy sur port 80)
 -   Backend (base URL proxied) : `http://localhost/api/` (via reverse-proxy)
 
 Endpoints implémentés dans l'API :
 
 -   `GET /api/health` — vérifie l'état de l'API (retourne `{ "status": "ok" }`).
--   `GET /api/items` — récupère la liste de tous les items. (Ce sera vide pour notre cas)
+-   `GET /api/items` — récupère la liste de tous les items.
 -   `POST /api/items` — crée un nouvel item (corps JSON avec les champs de `Item`).
 
-Note: les contrôleurs n'exposent plus `@CrossOrigin`; le reverse-proxy centralisé résout les problèmes CORS en gérant
-les en-têtes et les préflight OPTIONS.
+**Important** : Le frontend utilise des URLs relatives (`/api/...`) pour appeler l'API, ce qui garantit que toutes les
+requêtes passent par le reverse-proxy. Les contrôleurs Spring n'exposent plus `@CrossOrigin` ; le reverse-proxy gère les en-têtes CORS et les requêtes preflight OPTIONS.
 
 ## Problèmes rencontrés et solutions
 
-Voici les problèmes que nous avons pu rencontrer et les solutions que nous avons touvées :
+Voici les problèmes que nous avons pu rencontrer et les solutions que nous avons trouvées :
 
 -   Nous avons découvert le reverse proxy et avons mis un peu de temps à comprendre comme ça marchait réellement
 
